@@ -1,0 +1,26 @@
+#!/bin/bash
+# Builds iStats.app and iStats.zip into ./dist
+set -euo pipefail
+cd "$(dirname "$0")"
+APP="dist/iStats.app"
+rm -rf dist; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+clang -fobjc-arc -O2 -arch arm64 -mmacosx-version-min=14.0 main.m -o "$APP/Contents/MacOS/iStats" \
+  -framework Cocoa -framework IOKit -F/System/Library/PrivateFrameworks
+cp assets/icon.icns "$APP/Contents/Resources/AppIcon.icns"
+cat > "$APP/Contents/Info.plist" <<'P'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleName</key><string>iStats</string>
+<key>CFBundleIdentifier</key><string>io.github.istats</string>
+<key>CFBundleExecutable</key><string>iStats</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>1.0.0</string>
+<key>LSUIElement</key><true/>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+</dict></plist>
+P
+codesign --force --sign - "$APP"
+ditto -c -k --keepParent "$APP" dist/iStats.zip
+echo "Built dist/iStats.app and dist/iStats.zip"
