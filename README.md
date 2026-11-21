@@ -20,7 +20,7 @@ Requires an Apple Silicon Mac on macOS 14 or newer.
 ## Use
 
 - Double-click the overlay to unlock it, drag it where you want, double-click again to lock.
-- Menu bar `:)` for Hide Overlay, Start/Stop Recording, Quit.
+- Menu bar `:)` for Hide Overlay, Start/Stop Recording, Horizontal Layout (one row instead of a stack), Quit.
 
 ## Build
 
@@ -29,6 +29,10 @@ Requires an Apple Silicon Mac on macOS 14 or newer.
 ```
 
 Output goes to `dist/`. Needs Xcode command line tools.
+
+## Support
+
+If iStats is useful, you can [buy me a coffee on Ko-fi](https://ko-fi.com/wynix).
 
 ## License
 

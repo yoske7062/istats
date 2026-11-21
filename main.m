@@ -86,9 +86,9 @@ static int health(double v, double a, double b, double c) {
 // ---- App ----
 @interface Stats : NSObject <NSApplicationDelegate>
 @property NSPanel *panel; @property NSTextField *label; @property NSStatusItem *item;
-@property NSMenuItem *showItem, *recItem;
+@property NSMenuItem *showItem, *recItem, *layoutItem;
 @property (strong) dispatch_source_t timer;
-@property BOOL moving;
+@property BOOL moving, horizontal;
 @property NSMutableArray<NSArray<NSNumber *> *> *rec; @property NSDate *recStart;
 @end
 
@@ -140,6 +140,9 @@ static int health(double v, double a, double b, double c) {
     NSMenu *m = [NSMenu new];
     self.showItem = [m addItemWithTitle:@"Hide Overlay" action:@selector(toggleShow) keyEquivalent:@""];
     self.recItem = [m addItemWithTitle:@"Start Recording" action:@selector(toggleRec) keyEquivalent:@""];
+    self.layoutItem = [m addItemWithTitle:@"Horizontal Layout" action:@selector(toggleLayout) keyEquivalent:@""];
+    self.horizontal = [NSUserDefaults.standardUserDefaults boolForKey:@"horizontal"];
+    self.layoutItem.state = self.horizontal ? NSControlStateValueOn : NSControlStateValueOff;
     [m addItem:NSMenuItem.separatorItem];
     [m addItemWithTitle:@"Quit iStats" action:@selector(terminate:) keyEquivalent:@"q"];
     for (NSMenuItem *i in m.itemArray) if (i.action != @selector(terminate:)) i.target = self;
@@ -174,10 +177,10 @@ static int health(double v, double a, double b, double c) {
     NSFont *bold = [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightSemibold];
     NSColor *dim = [NSColor colorWithWhite:1 alpha:0.75];
     static NSShadow *sh; if (!sh) { sh = [NSShadow new]; sh.shadowColor = [NSColor colorWithWhite:0 alpha:0.9]; sh.shadowBlurRadius = 2.5; sh.shadowOffset = NSMakeSize(0, -1); }
-    if (s.length) [s appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"]];
+    if (s.length) [s appendAttributedString:[[NSAttributedString alloc] initWithString:self.horizontal ? @"   " : @"\n"]];
     [s appendAttributedString:[[NSAttributedString alloc] initWithString:(h >= 0 ? @"● " : @"  ")
         attributes:@{NSFontAttributeName: font, NSForegroundColorAttributeName: h >= 0 ? colors[h] : dim, NSShadowAttributeName: sh}]];
-    [s appendAttributedString:[[NSAttributedString alloc] initWithString:[name stringByPaddingToLength:5 withString:@" " startingAtIndex:0]
+    [s appendAttributedString:[[NSAttributedString alloc] initWithString:(self.horizontal ? [name stringByAppendingString:@" "] : [name stringByPaddingToLength:5 withString:@" " startingAtIndex:0])
         attributes:@{NSFontAttributeName: font, NSForegroundColorAttributeName: dim, NSShadowAttributeName: sh}]];
     [s appendAttributedString:[[NSAttributedString alloc] initWithString:value
         attributes:@{NSFontAttributeName: bold, NSForegroundColorAttributeName: NSColor.whiteColor, NSShadowAttributeName: sh}]];
@@ -191,8 +194,12 @@ static int health(double v, double a, double b, double c) {
     [self row:s name:@"TEMP" value:tp < 0 ? @"--" : [NSString stringWithFormat:@"%.0f°C", tp] h:health(tp, 75, 90, 100)];
     if (self.rec) [self row:s name:@"REC" value:[NSString stringWithFormat:@"%.0fs", -[self.recStart timeIntervalSinceNow]] h:3];
     self.label.attributedStringValue = s;
-    NSRect f = self.panel.frame; CGFloat h = self.rec ? 108 : 92;
-    if (f.size.height != h) { f.origin.y += f.size.height - h; f.size.height = h; [self.panel setFrame:f display:YES]; self.label.frame = NSInsetRect(self.panel.contentView.bounds, 10, 8); }
+    CGFloat w = self.horizontal ? (self.rec ? 520 : 440) : 184, h = self.horizontal ? 30 : (self.rec ? 108 : 92);
+    NSRect f = self.panel.frame;
+    if (f.size.height != h || f.size.width != w) {   // keep the top-left corner where it is
+        f.origin.y += f.size.height - h; f.size.height = h; f.size.width = w;
+        [self.panel setFrame:f display:YES]; self.label.frame = NSInsetRect(self.panel.contentView.bounds, 10, 8);
+    }
 }
 
 - (void)setMoving:(BOOL)on {
@@ -204,6 +211,12 @@ static int health(double v, double a, double b, double c) {
     v.layer.cornerRadius = 6;
     v.layer.backgroundColor = on ? [NSColor colorWithWhite:0 alpha:0.25].CGColor : NSColor.clearColor.CGColor;
     if (!on) [NSUserDefaults.standardUserDefaults setObject:NSStringFromPoint(self.panel.frame.origin) forKey:@"origin"];
+}
+
+- (void)toggleLayout {
+    self.horizontal = !self.horizontal;
+    self.layoutItem.state = self.horizontal ? NSControlStateValueOn : NSControlStateValueOff;
+    [NSUserDefaults.standardUserDefaults setBool:self.horizontal forKey:@"horizontal"];
 }
 
 - (void)toggleShow {
