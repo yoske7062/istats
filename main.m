@@ -103,7 +103,7 @@ static int health(double v, double a, double b, double c) {
     NSRect r = NSMakeRect(NSMaxX(screen) - 196, NSMaxY(screen) - 104, 184, 92);
     self.panel = [[NSPanel alloc] initWithContentRect:r styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel
                                               backing:NSBackingStoreBuffered defer:NO];
-    self.panel.level = NSScreenSaverWindowLevel;           // above games, including borderless fullscreen
+    self.panel.level = CGShieldingWindowLevel() + 1;        // above everything, including games that capture the display (League fullscreen)
     self.panel.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary
                                   | NSWindowCollectionBehaviorStationary | NSWindowCollectionBehaviorIgnoresCycle;
     self.panel.ignoresMouseEvents = YES;                    // clicks go to the game
@@ -117,7 +117,7 @@ static int health(double v, double a, double b, double c) {
     self.panel.contentView = box;
     self.panel.movableByWindowBackground = YES;
     NSString *saved = [NSUserDefaults.standardUserDefaults stringForKey:@"origin"];
-    if (saved) [self.panel setFrameOrigin:NSPointFromString(saved)];
+    if (saved) { NSRect f = self.panel.frame; f.origin = NSPointFromString(saved); [self.panel setFrame:[self onScreen:f] display:NO]; }
     [self.panel orderFrontRegardless];
     // Locked: clicks pass through to the game, so a global monitor spots the double-click on the data.
     [NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown handler:^(NSEvent *e) {
@@ -129,7 +129,8 @@ static int health(double v, double a, double b, double c) {
         if (e.type == NSEventTypeLeftMouseDown && e.clickCount == 2) { [self setMoving:NO]; return nil; }
         if (e.type == NSEventTypeLeftMouseDragged) {
             NSPoint o = self.panel.frame.origin;
-            [self.panel setFrameOrigin:NSMakePoint(o.x + e.deltaX, o.y - e.deltaY)];
+            NSRect f = self.panel.frame; f.origin = NSMakePoint(o.x + e.deltaX, o.y - e.deltaY);
+            [self.panel setFrame:[self onScreen:f] display:YES];
             return nil;
         }
         return nil;
@@ -198,8 +199,18 @@ static int health(double v, double a, double b, double c) {
     NSRect f = self.panel.frame;
     if (f.size.height != h || f.size.width != w) {   // keep the top-left corner where it is
         f.origin.y += f.size.height - h; f.size.height = h; f.size.width = w;
-        [self.panel setFrame:f display:YES]; self.label.frame = NSInsetRect(self.panel.contentView.bounds, 10, 8);
+        [self.panel setFrame:[self onScreen:f] display:YES]; self.label.frame = NSInsetRect(self.panel.contentView.bounds, 10, 8);
     }
+}
+
+// Keep the overlay fully inside a screen: a saved spot from another layout or a gone monitor must not hide it.
+- (NSRect)onScreen:(NSRect)f {
+    NSScreen *best = NSScreen.mainScreen;
+    for (NSScreen *s in NSScreen.screens) if (NSIntersectsRect(s.frame, f)) { best = s; break; }
+    NSRect v = best.visibleFrame;
+    f.origin.x = MAX(NSMinX(v), MIN(f.origin.x, NSMaxX(v) - f.size.width));
+    f.origin.y = MAX(NSMinY(v), MIN(f.origin.y, NSMaxY(v) - f.size.height));
+    return f;
 }
 
 - (void)setMoving:(BOOL)on {
