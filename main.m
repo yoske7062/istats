@@ -264,7 +264,7 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
     cpu = gpu = mem = temp = -1;
-    [NSUserDefaults.standardUserDefaults registerDefaults:@{@"kbSwitch": @3, @"kbVolume": @0.5, @"kbPitch": @1.0, @"kbRelease": @YES}];
+    [NSUserDefaults.standardUserDefaults registerDefaults:@{@"kbSwitch": @3, @"kbVolume": @0.5, @"kbPitch": @1.0, @"kbRelease": @NO}];
     NSRect screen = NSScreen.mainScreen.visibleFrame;
     NSRect r = NSMakeRect(NSMaxX(screen) - 196, NSMaxY(screen) - 104, 184, 92);
     self.panel = [[NSPanel alloc] initWithContentRect:r styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel
@@ -554,7 +554,8 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
     [self wakeAudio];
 }
 
-// The audio device only runs while you type: it stops 20 s after the last key, so idle costs nothing.
+// The audio device only runs while you type: it stops 3 min after the last key, so idle costs nothing. Not sooner:
+// waking Bluetooth headphones takes long enough that the first keys after a pause would sound late.
 - (void)wakeAudio {
     lastKey = CFAbsoluteTimeGetCurrent();
     if (!self.engine) {
@@ -577,12 +578,14 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
     for (int i = 0; i < NV; i++) voices[i].d = NULL;
     unsigned h = atomic_load(&qHead);
     if (h != atomic_load(&qTail)) atomic_store(&qTail, h - 1);
+    UInt32 frames = 128;   // 2.7 ms I/O buffer instead of the default 512 (10.7 ms): the sound lands closer to the key
+    AudioUnitSetProperty(self.engine.outputNode.audioUnit, kAudioDevicePropertyBufferFrameSize, kAudioUnitScope_Global, 0, &frames, sizeof frames);
     if (![self.engine startAndReturnError:nil]) { self.engine = nil; return; }
     if (self.idle) return;
     dispatch_source_t t = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-    dispatch_source_set_timer(t, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), 5 * NSEC_PER_SEC, NSEC_PER_SEC);
+    dispatch_source_set_timer(t, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC), 30 * NSEC_PER_SEC, 5 * NSEC_PER_SEC);
     dispatch_source_set_event_handler(t, ^{
-        if (CFAbsoluteTimeGetCurrent() - self->lastKey < 20) return;
+        if (CFAbsoluteTimeGetCurrent() - self->lastKey < 180) return;
         [self.engine stop];
         dispatch_source_cancel(self.idle); self.idle = nil;
     });

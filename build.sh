@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 APP="dist/iStats.app"
 rm -rf dist; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 clang -fobjc-arc -O2 -arch arm64 -mmacosx-version-min=14.0 main.m -o "$APP/Contents/MacOS/iStats" \
-  -framework Cocoa -framework AVFoundation -framework IOKit -F/System/Library/PrivateFrameworks
+  -framework Cocoa -framework AVFoundation -framework AudioToolbox -framework IOKit -F/System/Library/PrivateFrameworks
 cp assets/icon.icns "$APP/Contents/Resources/AppIcon.icns"
 cat > "$APP/Contents/Info.plist" <<'P'
 <?xml version="1.0" encoding="UTF-8"?>
