@@ -431,7 +431,7 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
 - (NSMenu *)keyboardMenu {
     NSMenu *k = [NSMenu new];
     self.kbItem = [k addItemWithTitle:@"Play Key Sounds" action:@selector(toggleKeys) keyEquivalent:@""];
-    self.permItem = [k addItemWithTitle:@"Allow in Input Monitoring…" action:@selector(openPermission) keyEquivalent:@""];
+    self.permItem = [k addItemWithTitle:@"Needs Input Monitoring: Open Settings…" action:@selector(openPermission) keyEquivalent:@""];
     self.permItem.hidden = YES;
     [k addItem:NSMenuItem.separatorItem];
     for (int i = 0; i < NSW; i++) [k addItemWithTitle:@(switches[i].name) action:@selector(pickSwitch:) keyEquivalent:@""].tag = i;
@@ -469,7 +469,11 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
     on ? [self startKeys] : [self stopKeys];
     [self refreshKeys];
 }
-- (void)pickSwitch:(NSMenuItem *)i { [NSUserDefaults.standardUserDefaults setInteger:i.tag forKey:@"kbSwitch"]; [self refreshKeys]; [self demo]; }
+- (void)pickSwitch:(NSMenuItem *)i {   // picking a switch means you want to type with it: turn key sounds on
+    [NSUserDefaults.standardUserDefaults setInteger:i.tag forKey:@"kbSwitch"];
+    if (![NSUserDefaults.standardUserDefaults boolForKey:@"kbOn"]) { [NSUserDefaults.standardUserDefaults setBool:YES forKey:@"kbOn"]; [self startKeys]; }
+    [self refreshKeys]; [self demo];
+}
 - (void)pickVolume:(NSMenuItem *)i { [NSUserDefaults.standardUserDefaults setFloat:i.tag / 100.0f forKey:@"kbVolume"]; [self refreshKeys]; [self demo]; }
 - (void)pickPitch:(NSMenuItem *)i { [NSUserDefaults.standardUserDefaults setFloat:i.tag / 100.0f forKey:@"kbPitch"]; [self refreshKeys]; [self demo]; }
 - (void)toggleRelease { [NSUserDefaults.standardUserDefaults setBool:!kbRelease forKey:@"kbRelease"]; [self refreshKeys]; }
@@ -492,7 +496,8 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
 - (void)startKeys {
     if (tap) return;
     CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp) | CGEventMaskBit(kCGEventFlagsChanged);
-    tap = CGEventTapCreate(kCGSessionEventTap, kCGTailAppendEventTap, kCGEventTapOptionListenOnly, mask, keyTap, (__bridge void *)self);
+    if (CGPreflightListenEventAccess())   // without the grant a tap may still be created but hear nothing
+        tap = CGEventTapCreate(kCGSessionEventTap, kCGTailAppendEventTap, kCGEventTapOptionListenOnly, mask, keyTap, (__bridge void *)self);
     if (!tap) {   // no permission yet: ask once, then retry quietly until it is granted or the feature is turned off
         self.permItem.hidden = NO;
         if (!self.permTimer) {
