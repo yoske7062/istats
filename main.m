@@ -580,7 +580,8 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
     if (h != atomic_load(&qTail)) atomic_store(&qTail, h - 1);
     UInt32 frames = 128;   // 2.7 ms I/O buffer instead of the default 512 (10.7 ms): the sound lands closer to the key
     AudioUnitSetProperty(self.engine.outputNode.audioUnit, kAudioDevicePropertyBufferFrameSize, kAudioUnitScope_Global, 0, &frames, sizeof frames);
-    if (![self.engine startAndReturnError:nil]) { self.engine = nil; return; }
+    NSError *err;
+    if (![self.engine startAndReturnError:&err]) { NSLog(@"key sounds: audio start failed: %@", err); self.engine = nil; return; }
     if (self.idle) return;
     dispatch_source_t t = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
     dispatch_source_set_timer(t, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC), 30 * NSEC_PER_SEC, 5 * NSEC_PER_SEC);
