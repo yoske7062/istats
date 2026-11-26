@@ -27,7 +27,7 @@ Requires an Apple Silicon Mac on macOS 14 or newer.
 
 Menu bar `:)` > Keyboard Sounds > Play Key Sounds. Pick a switch to hear a short demo. The first time, macOS asks for Input Monitoring: allow iStats in System Settings > Privacy & Security > Input Monitoring and the sounds start on their own (if not, quit and reopen iStats).
 
-The sounds are synthesized, not recordings, so they are close to each switch rather than exact copies. iStats only sees which key went down or up to pick a sound; it never changes, blocks or saves your keys. The audio device only runs while you type and stops 20 seconds after the last key.
+The sounds are synthesized, not recordings, so they are close to each switch rather than exact copies. iStats only sees which key went down or up to pick a sound; it never changes, blocks or saves your keys. The audio device only runs while you type and stops about 20 seconds after the last key.
 
 If you build iStats yourself, each new build counts as a new app for macOS, so you may need to allow Input Monitoring again.
 

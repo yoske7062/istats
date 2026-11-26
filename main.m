@@ -453,7 +453,8 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
 - (void)refreshKeys {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
     kbSwitch = (int)MIN(MAX([d integerForKey:@"kbSwitch"], 0), NSW - 1);
-    kbVolume = [d floatForKey:@"kbVolume"]; kbPitch = [d floatForKey:@"kbPitch"]; kbRelease = [d boolForKey:@"kbRelease"];
+    kbVolume = MIN(MAX([d floatForKey:@"kbVolume"], 0), 1); kbPitch = MIN(MAX([d floatForKey:@"kbPitch"], .5f), 2);  // clamped: a bad value must not run the audio thread off a buffer
+    if (!(kbPitch == kbPitch)) kbPitch = 1; if (!(kbVolume == kbVolume)) kbVolume = .5f; kbRelease = [d boolForKey:@"kbRelease"];
     for (NSMenuItem *i in self.kbMenu.itemArray) {
         BOOL on = i.action == @selector(toggleKeys) ? [d boolForKey:@"kbOn"] : i.action == @selector(pickSwitch:) ? i.tag == kbSwitch
                 : i.action == @selector(toggleRelease) ? kbRelease : NO;
@@ -564,15 +565,22 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
         [e attachNode:src];
         [e connect:src to:e.mainMixerNode format:f];
         // Headphones plugged in or out: the engine stops itself. Drop it; the next key builds one on the new device.
-        [NSNotificationCenter.defaultCenter addObserverForName:AVAudioEngineConfigurationChangeNotification object:e queue:NSOperationQueue.mainQueue
-            usingBlock:^(NSNotification *note) { if (self.engine == note.object) { [self.engine stop]; self.engine = nil; } }];
+        static dispatch_once_t once;
+        dispatch_once(&once, ^{
+            [NSNotificationCenter.defaultCenter addObserverForName:AVAudioEngineConfigurationChangeNotification object:nil queue:NSOperationQueue.mainQueue
+                usingBlock:^(NSNotification *note) { if (self.engine && self.engine == note.object) { [self.engine stop]; self.engine = nil; } }];
+        });
         self.engine = e;
     }
     if (self.engine.isRunning) return;
+    // The render block is not running here, so it is safe to drop what piled up while stopped: keep only the newest key.
+    for (int i = 0; i < NV; i++) voices[i].d = NULL;
+    unsigned h = atomic_load(&qHead);
+    if (h != atomic_load(&qTail)) atomic_store(&qTail, h - 1);
     if (![self.engine startAndReturnError:nil]) { self.engine = nil; return; }
     if (self.idle) return;
     dispatch_source_t t = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-    dispatch_source_set_timer(t, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC), 10 * NSEC_PER_SEC, NSEC_PER_SEC);
+    dispatch_source_set_timer(t, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), 5 * NSEC_PER_SEC, NSEC_PER_SEC);
     dispatch_source_set_event_handler(t, ^{
         if (CFAbsoluteTimeGetCurrent() - self->lastKey < 20) return;
         [self.engine stop];
