@@ -21,6 +21,10 @@ cat > "$APP/Contents/Info.plist" <<'P'
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 </dict></plist>
 P
-codesign --force --sign - "$APP"
+# A local signing certificate keeps the same identity across builds, so macOS keeps the Input Monitoring grant.
+# Without one, sign ad hoc (every build then counts as a new app).
+ID="iStats Local Signing"
+security find-identity -p codesigning | grep -q "$ID" || ID=-
+codesign --force --sign "$ID" "$APP"
 ditto -c -k --keepParent "$APP" dist/iStats.zip
 echo "Built dist/iStats.app and dist/iStats.zip"
