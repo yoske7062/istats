@@ -6,6 +6,7 @@
 #import <Cocoa/Cocoa.h>
 #import <AVFoundation/AVFoundation.h>
 #import <IOKit/IOKitLib.h>
+#import <ServiceManagement/ServiceManagement.h>
 #include <stdatomic.h>
 #include <mach/mach.h>
 #include <sys/sysctl.h>
@@ -236,7 +237,7 @@ static CGEventRef keyTap(CGEventTapProxy proxy, CGEventType type, CGEventRef e, 
 // ---- App ----
 @interface Stats : NSObject <NSApplicationDelegate>
 @property NSPanel *panel; @property NSTextField *label; @property NSStatusItem *item;
-@property NSMenuItem *showItem, *recItem, *layoutItem, *kbItem, *permItem;
+@property NSMenuItem *showItem, *recItem, *layoutItem, *kbItem, *permItem, *loginItem;
 @property NSMenu *kbMenu;
 @property (strong) dispatch_source_t timer, idle;
 @property BOOL moving, horizontal;
@@ -312,6 +313,8 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
     self.layoutItem.state = self.horizontal ? NSControlStateValueOn : NSControlStateValueOff;
     [m addItemWithTitle:@"Keyboard Sounds" action:nil keyEquivalent:@""].submenu = [self keyboardMenu];
     [m addItem:NSMenuItem.separatorItem];
+    self.loginItem = [m addItemWithTitle:@"Launch at Login" action:@selector(toggleLogin) keyEquivalent:@""];
+    self.loginItem.state = SMAppService.mainAppService.status == SMAppServiceStatusEnabled ? NSControlStateValueOn : NSControlStateValueOff;
     [m addItemWithTitle:@"Quit iStats" action:@selector(terminate:) keyEquivalent:@"q"];
     for (NSMenuItem *i in m.itemArray) if (i.action && i.action != @selector(terminate:)) i.target = self;
     self.item.menu = m;
@@ -419,6 +422,15 @@ static float rnd(void) { return arc4random_uniform(1000) / 1000.0f; }
     self.horizontal = !self.horizontal;
     self.layoutItem.state = self.horizontal ? NSControlStateValueOn : NSControlStateValueOff;
     [NSUserDefaults.standardUserDefaults setBool:self.horizontal forKey:@"horizontal"];
+}
+
+- (void)toggleLogin {
+    SMAppService *svc = SMAppService.mainAppService;
+    NSError *err = nil;
+    BOOL ok = svc.status == SMAppServiceStatusEnabled ? [svc unregisterAndReturnError:&err] : [svc registerAndReturnError:&err];
+    if (!ok) NSLog(@"Launch at login: %@", err);
+    if (svc.status == SMAppServiceStatusRequiresApproval) [SMAppService openSystemSettingsLoginItems];
+    self.loginItem.state = svc.status == SMAppServiceStatusEnabled ? NSControlStateValueOn : NSControlStateValueOff;
 }
 
 - (void)toggleShow {
